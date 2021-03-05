@@ -16,10 +16,12 @@ wcs.py
 
 
 ## Dependencies
-This script requires python 3.  It was written and tested using version 3.4.3
+1. This script requires python 3.  It was written and tested using version 3.6.2
+2. Code must be compiled with `gcc`.  The script directly calls the utility function `readelf`.  `readelf` probably
+resides in in the same folder as the gcc executable on your system.
 
 ## Inputs - Files from gcc.
-The script will search the current directory for sets of files with the names `<name>.o`, `<name>.su` and `<name>.c.270r.dfinish`. If all three are found the script will calculate the worst case stack for every function in the `<name>.c`.
+The script will search the current directory for sets of files with the names `<name>.o`, `<name>.su` and `<name>.c.<id>.dfinish`. If all three are found the script will calculate the worst case stack for every function in the translation unit `<name>.c`.  The value of `<id>` depends on the version of GCC you use and is auto-detected by the script.  In gcc 5.3.1, for example, the value of `<id>` is `270r`. 
 
 See the usage section for information about how to generate these files.
 
@@ -39,24 +41,30 @@ The script will output a list of functions in a table with the following columns
 
 1. **Translation Unit** (e.g. the name of the file where the function is implemented)
 2. **Function Name**
-3. **Stack** Either the maximum number of bytes during a call to this function (including nested calls at all depths)
-or the string `unbounded` if the maximum cannot be determined because some function in the call tree is recursively defined or makes calls via function pointer.
-4. **Unresolved Dependancies** A list functions that are called somewhere in the call tree for which there is no
+3. **Stack** - The maximum number of bytes used during a call to this function (including nested calls at all depths).
+If the maximum cannot be determined because some function in the call tree is recursively 
+defined or makes calls via function pointer this returns the string `unbounded`.  
+If there are one or more unresolved dependencies this returns the worst case stack assuming that each unresolved dependency 
+uses no stack space preceded by the string `unbounded:`.  Consider adding a manual stack usage file, for better predictions.
+4. **Unresolved Dependencies** A list functions that are called somewhere in the call tree for which there is no
 definition in any of the given input files.
 
 ## Known Limitations:
 1. wcs.py can only determine stack usage from `*.c` source.  Calls to compiled libraries (e.g. libc.a) or to assembly functions will result in `unbounded` (e.g. unknown) stack usage.
-2. Functions compiled with the `weak` attribute will crash this script
-3. The actual worst case stack may be greater than reported by this function if outside actors modify the stack.  Common offenders are:
+2. The actual worst case stack may be greater than reported by this function if outside actors modify the stack.  Common offenders are:
     1. Interrupt handlers
     2. Operating system context changes
-4. The use of inline assembly will result in potentially incorrect results.  Specifically, if a function uses inline assembly to load or store from the stack, modify the stack pointer, or branch to code that does likewise, expect incorrect results.  
+3. The use of inline assembly will result in potentially incorrect results.  Specifically, if a function uses inline assembly to load or store from the stack, modify the stack pointer, or branch to code that does likewise, expect incorrect results.  
 
-**The script has no way to detect situations 3 and 4.  In the presence of these conditions the script will still complete successfully.  Use caution.**
+**The script has no way to detect situations 2 and 3.  In the presence of these conditions the script will still complete successfully.  Use caution.**
 
-## Notes
-5. This script assumes little endian byte ordering for object files.  If you are compiling for a big-endian system set the `byte_order` variable to `">"` in the file `elf.py`
+## Updates
 
-```
-byte_order = ">" 
-```
+### November 30th, 2017
+1. Removed removed home-brew reading of the symbol table (elf.py) in favor of parsing output from `readelf`.  This should improve compatibility.
+2. Fixed 2 spelling errors
+3. Fixed bug when displaying a `multiple declarations` error
+
+### April 25, 2018
+1. Added autodetection of the RTL extension (e.g. '270r')
+2. Added better error message
